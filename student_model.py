@@ -21,7 +21,8 @@ def build_classifier(train_texts, train_labels, method, config):
         # 词表与 IDF 只在 train_texts 上学习。预测时只 transform，不重新 fit。
         vectorizer=TfidfVectorizer(lowercase=True, ngram_range=tuple(config.get('ngram_range',[1,1])))
         classifier=(MultinomialNB(alpha=config.get('alpha',1.0)) if method=='nb' else
-                    LogisticRegression(C=config.get('C',1.0), max_iter=1000, solver='liblinear', random_state=42))
+                    LogisticRegression(C=config.get('C',1.0), max_iter=1000, solver='liblinear', random_state=42,
+                                       class_weight=config.get('class_weight')))
         model=Pipeline([('tfidf',vectorizer),('classifier',classifier)])
         model.fit(train_texts, train_labels)
         return model

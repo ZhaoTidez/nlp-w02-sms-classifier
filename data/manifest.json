@@ -1,0 +1,140 @@
+{
+  "version": "W02-SMS-3.0",
+  "dataset": "SMS Spam Collection",
+  "creators": "Tiago Almeida and José María Gómez Hidalgo",
+  "citation": "Almeida, T. & Hidalgo, J. (2011). SMS Spam Collection. UCI Machine Learning Repository. https://doi.org/10.24432/C5CC84",
+  "source": "https://archive.ics.uci.edu/dataset/228/sms+spam+collection",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "downloaded": "2026-09-29",
+  "raw_sha256": "7d039a24a6083ed9ef0f806ebad56bbb976e3aeb8de05669173bfdc4996c239d",
+  "original_rows": 5574,
+  "parent_train_sha256": "41f8c04cfd0bca264f6918c013492e0c4fa397294fb275c845e6579d449abdc9",
+  "selection": "W04 train only; per label sort SHA256(W02-open-methods| + id); floor70% train, floor15% dev, rest test. Preserve text; map labels to ham/spam.",
+  "counts": {
+    "train": {
+      "ham": 2212,
+      "spam": 313
+    },
+    "dev": {
+      "ham": 474,
+      "spam": 67
+    },
+    "test": {
+      "total": 543
+    }
+  },
+  "files": {
+    "train.jsonl": "6f290d75baf8d9bac0d0803769bba194224fb675d59f09685c23eaf190f68684",
+    "dev.jsonl": "ddbd24425b96725569583df66f1dbb84adab2921cf9ebfb058a898561fa49f0d",
+    "test_texts.jsonl": "a972228a13653c0a6988e1b331b57ce5b88f75b5fbedd675f2a2df3bac7f889b"
+  },
+  "normalization_group_repair": {
+    "normalization": "lowercase + regex [a-z]+ + join with spaces",
+    "cross_partition_groups": 12,
+    "procedure": "Move all cross-partition group members into train. For each incoming member, swap out a same-label globally unique normalized-text train record, selecting minimum SHA256(W02-group-repair| + id). Process groups by minimum id, members by id. This preserves partition class sizes.",
+    "swaps": [
+      {
+        "to_train": "sms-00262",
+        "to_partition": "dev",
+        "from_train": "sms-01638"
+      },
+      {
+        "to_train": "sms-02509",
+        "to_partition": "test",
+        "from_train": "sms-03931"
+      },
+      {
+        "to_train": "sms-00285",
+        "to_partition": "test",
+        "from_train": "sms-02358"
+      },
+      {
+        "to_train": "sms-00336",
+        "to_partition": "test",
+        "from_train": "sms-03572"
+      },
+      {
+        "to_train": "sms-02428",
+        "to_partition": "dev",
+        "from_train": "sms-01467"
+      },
+      {
+        "to_train": "sms-04659",
+        "to_partition": "test",
+        "from_train": "sms-00369"
+      },
+      {
+        "to_train": "sms-04842",
+        "to_partition": "test",
+        "from_train": "sms-05452"
+      },
+      {
+        "to_train": "sms-05504",
+        "to_partition": "dev",
+        "from_train": "sms-01719"
+      },
+      {
+        "to_train": "sms-05529",
+        "to_partition": "test",
+        "from_train": "sms-00882"
+      },
+      {
+        "to_train": "sms-01253",
+        "to_partition": "test",
+        "from_train": "sms-00016"
+      },
+      {
+        "to_train": "sms-02355",
+        "to_partition": "test",
+        "from_train": "sms-00043"
+      },
+      {
+        "to_train": "sms-05118",
+        "to_partition": "dev",
+        "from_train": "sms-02421"
+      },
+      {
+        "to_train": "sms-01654",
+        "to_partition": "test",
+        "from_train": "sms-00434"
+      },
+      {
+        "to_train": "sms-02942",
+        "to_partition": "dev",
+        "from_train": "sms-04250"
+      },
+      {
+        "to_train": "sms-05113",
+        "to_partition": "test",
+        "from_train": "sms-01367"
+      },
+      {
+        "to_train": "sms-02313",
+        "to_partition": "test",
+        "from_train": "sms-03093"
+      },
+      {
+        "to_train": "sms-02827",
+        "to_partition": "dev",
+        "from_train": "sms-05380"
+      },
+      {
+        "to_train": "sms-03267",
+        "to_partition": "test",
+        "from_train": "sms-02872"
+      },
+      {
+        "to_train": "sms-05061",
+        "to_partition": "dev",
+        "from_train": "sms-05193"
+      },
+      {
+        "to_train": "sms-05550",
+        "to_partition": "test",
+        "from_train": "sms-01840"
+      }
+    ]
+  },
+  "student_test_policy": "test_texts.jsonl has id/text only. Reference labels stay in teacher materials; students submit predicted labels in test_predictions.csv."
+}

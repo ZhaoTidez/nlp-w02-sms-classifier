@@ -1,0 +1,191 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第二课：垃圾短信识别</title><style>body{font-family:system-ui,"PingFang SC",sans-serif;color:#20343a;background:#fcfcf8;max-width:940px;margin:42px auto;padding:0 26px;line-height:1.85}h1{font-size:32px}h2{margin-top:48px;border-bottom:2px solid #096b63;padding-bottom:10px}a{color:#096b63}pre{padding:18px;background:#eef2ef;overflow:auto;line-height:1.6;border-radius:6px}code{font-family:monospace}table{border-collapse:collapse;width:100%;font-size:15px}td,th{padding:10px;border:1px solid #c8d3cf;text-align:left}th{background:#e8efec}@media print{body{margin:0;max-width:none}pre{white-space:pre-wrap}h2{break-after:avoid}}</style><main><h1>第二课：实现一个垃圾短信分类器</h1>
+<p><strong>个人完成 · 约 135 分钟 · 版本 W02-SMS-3.0。</strong></p>
+<p>你要做一个短信筛选程序：输入一条英文短信，输出 <code>ham</code>（正常）或 <code>spam</code>（垃圾）。训练集和开发集提供参考标签，测试集只提供正文与编号。预测时程序只接收正文。你用开发集标签比较方法，教师用保留的测试标签评测提交答案。</p>
+<p>例如 <code>Are you free tonight?</code>（你今晚有空吗）通常是正常邀约，<code>Claim your free prize now!</code>（立即领取你的免费奖品）可能是垃圾消息。两句是教学示例，都含 free，说明仅靠一个词可能误判。</p>
+<p>你先运行大家共有的关键词规则，观察它的错误，再选择一种方法尝试改进。</p>
+<p>你可以改进规则，也可以训练机器学习分类器，或实现自己的方法。本包已提供规则、TF-IDF＋朴素贝叶斯、TF-IDF＋逻辑回归三种可运行起点。</p>
+<p>每人只需完成一个候选方法，在开发集上与简单规则比较，然后用自己的方法对全部测试短信给出预测答案。不必把三种方法全做一遍，不按算法复杂程度或最高分排名。最后提交自动生成的个人 ZIP，内含测试集答案 <code>test_predictions.csv</code>，另完成第二课 5 题测验。</p>
+<h2>0. 打开材料</h2>
+<ol>
+<li>下载并解压 <code>W02-学生实践包.zip</code>。进入里面的 <code>nlp_w02</code> 文件夹；不要在压缩包内运行。</li>
+<li><code>学生实践手册.html</code> 是同一份手册的只读预览；需要填写和运行的是 <code>学生实践手册.ipynb</code>。选择 Notebook 后可直接从头操作，无需先把网页另读一遍。下面出现的代码都已放进 Notebook，无需从网页逐段复制。</li>
+<li>若上一课的 Jupyter 环境可用，在其中打开本 Notebook，先运行第 1 节。若缺少依赖，在 Notebook 新建单元格执行 <code>%pip install -r requirements.txt</code>，然后重启内核。无需下载 NLTK 语料。</li>
+<li>首次安装时，在此文件夹打开终端，执行下面适合自己的命令。安装需要网络；数据已随包提供，安装后练习无需联网或 GPU。</li>
+</ol>
+<p>Windows：</p>
+<pre><code class="language-text">py -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m jupyter lab
+</code></pre>
+<p>macOS / Linux：</p>
+<pre><code class="language-text">python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m jupyter lab
+</code></pre>
+<p>浏览器打开 Jupyter 后选择 <code>学生实践手册.ipynb</code>。按 <code>Shift + Enter</code> 运行当前单元格，从上往下操作。Notebook 中按提示选择配置和填写说明；需要改变算法时编辑 <code>student_model.py</code>。若提示变量未定义，先运行它前面的单元格；若找不到 <code>sms_lab</code>，确认 Notebook 与 <code>sms_lab.py</code> 在同一文件夹。</p>
+<h2>1. 数据及用途（约 15 分钟）</h2>
+<p>数据来自公开的 <strong>SMS Spam Collection</strong>。<code>id</code> 是短信编号，<code>text</code> 是短信正文，<code>label</code> 是正常（ham）/垃圾（spam）类别。训练集和开发集提供参考类别，测试集只提供编号和正文。</p>
+<table>
+<thead>
+<tr>
+  <th>分区</th>
+  <th style="text-align:right">数量</th>
+  <th>提供哪些内容</th>
+  <th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>train：训练集</td>
+  <td style="text-align:right">2,525</td>
+  <td>正文与参考标签（正常2,212 / 垃圾313）</td>
+  <td>学习词表、IDF和分类参数；规则方法也可查看</td>
+</tr>
+<tr>
+  <td>dev：开发集</td>
+  <td style="text-align:right">541</td>
+  <td>正文与参考标签（正常474 / 垃圾67）</td>
+  <td>查看错误、比较方法、调整规则或参数</td>
+</tr>
+<tr>
+  <td>test：测试集</td>
+  <td style="text-align:right">543</td>
+  <td><strong>只有编号和正文，没有参考标签</strong></td>
+  <td>用确定的方法生成每条短信的预测答案，交教师评测</td>
+</tr>
+</tbody>
+</table>
+<p>三部分互不重叠。模型只用训练集学习，开发集用于比较与选择。不要把开发集加入训练，也不要把测试集用于学习词表、调参或从外部查答案。</p>
+<p>训练时可以使用 train 标签；预测一条新短信时只输入正文。<code>fit</code> 表示从训练数据学习，<code>predict</code> 表示对新正文作判断。配套代码按此分工传递数据。</p>
+<p>运行下面单元格查看数据样例。不需要手工阅读或标注全部测试短信，测试答案由你的程序逐条生成。</p>
+<pre><code class="language-python">import sms_lab as lab
+lab.show_data()
+</code></pre>
+<h2>2. 运行简单规则并观察错误（约 20 分钟）</h2>
+<p><strong>基线</strong>是所有人共同使用的简单比较对象，代码已提供：出现 free、win、prize、cash 中任意一个完整英文词就预测垃圾，否则预测正常。先转小写，再按连续英文字母提词；winner 不算 win。</p>
+<p>运行下面单元格。初始规则在开发集上的结果应为：正常判对 469、误拦 5、垃圾检出 28、漏检 39。</p>
+<ul>
+<li><strong>误拦</strong>：参考标签是正常，预测成垃圾，会挡住有用消息。</li>
+<li><strong>漏检</strong>：参考标签是垃圾，预测成正常，会放过垃圾消息。</li>
+</ul>
+<p>从输出中各选一条，记录 ID。解释误拦中的哪个词触发了规则、原文在说什么；解释漏检中的垃圾消息线索，以及为什么初始规则没识别出来。英文缩写可借助翻译理解，运行分类器仍用英文原文。</p>
+<pre><code class="language-python">baseline_rows = lab.baseline_dev()
+print(&quot;误拦：&quot;)
+lab.show_errors(baseline_rows, kind='误拦')
+print(&quot;漏检：&quot;)
+lab.show_errors(baseline_rows, kind='漏检')
+# 想看更多可调整 limit，例如 limit=50。
+</code></pre>
+<h2>3. 选择并实现一个方法（约 40 分钟）</h2>
+<p>选择一个起点即可。下面代码可直接运行；你负责理解方法、选择方案并解释结果，不要求从零手写学习算法。</p>
+<table>
+<thead>
+<tr>
+  <th>选择</th>
+  <th>你可以做什么</th>
+  <th>起始配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>rule</code>：改进规则</td>
+  <td>修改触发词和判断条件；也可编辑 student_model.py 扩展规则逻辑</td>
+  <td><code>{'keywords':['free','win','prize','cash'], 'min_hits':2}</code></td>
+</tr>
+<tr>
+  <td><code>nb</code>：TF-IDF＋朴素贝叶斯</td>
+  <td>让模型从训练短信学习词与类别的关系</td>
+  <td><code>{'ngram_range':[1,1], 'alpha':1.0}</code></td>
+</tr>
+<tr>
+  <td><code>lr</code>：TF-IDF＋逻辑回归</td>
+  <td>让模型学习不同文本特征对分类的权重</td>
+  <td><code>{'ngram_range':[1,1], 'C':1.0}</code></td>
+</tr>
+<tr>
+  <td><code>custom</code>：自定义</td>
+  <td>在 student_model.py 中接入自己的分类器</td>
+  <td>自己需要的参数字典</td>
+</tr>
+</tbody>
+</table>
+<p><strong>机器学习起点怎样工作？</strong> TF-IDF 把正文转换成一组词语特征数值，分类器用这些数值与训练标签学习。<code>ngram_range=[1,1]</code> 使用单词；<code>[1,2]</code> 还包含相邻两个词的组合。<code>alpha</code> 是朴素贝叶斯的平滑参数，<code>C</code> 控制逻辑回归对复杂权重的约束强弱。本课可直接用默认值，无需推导公式或遍历参数。</p>
+<p>你来设置下方 <code>METHOD</code> 和 <code>CONFIG</code>，运行后会在<strong>同一个开发集</strong>上展示规则基线和你的方法。默认选择 nb，是便于第一次运行的起点，不是指定答案。</p>
+<p>如需调整，可改一个参数或一处规则，再重新运行这一格，比较效果。一次改一个因素更容易解释，但本次不限制你只能改关键词或门槛。用开发集选择最终方案即可，不需要穷举。</p>
+<p>所有模型构建代码在 <strong>student_model.py</strong>，可以在 Jupyter 文件列表中打开阅读或修改。每次运行下面单元格都会重新读取这个文件，用训练集重新构建模型。推荐先运行已有起点，再按自己的想法修改。</p>
+<pre><code class="language-python"># 你来选择。三种现成方法任选一种，也可接入 custom。
+METHOD = 'nb'
+CONFIG = {'ngram_range': [1, 1], 'alpha': 1.0}
+
+experiment = lab.fit_and_compare(METHOD, CONFIG)
+lab.show_errors(experiment['dev_candidate'], limit=5)
+</code></pre>
+<h3>自定义方法的统一接口（仅选择 custom 时需要）</h3>
+<p>在 <code>student_model.py</code> 中定义自己的类，并在 <code>build_classifier(train_texts, train_labels, method, config)</code> 的 custom 分支返回已准备好的模型对象。该对象须有 <code>predict(texts)</code> 方法：输入正文列表，按原顺序返回同样长度的 <code>'ham'</code> / <code>'spam'</code> 列表。</p>
+<p>可以使用新的规则、特征或分类算法。不要按 ID、行号或完整原文查答案。学习到的词表、统计量与参数只能来自训练集；开发集用于比较与选择。全部实现放在 <code>student_model.py</code>，新增依赖写入 <code>requirements.txt</code>，固定随机种子，使导出后可以重新运行。课堂不要求下载大模型或申请 GPU，优先完成一个能在现有环境跑通的方法。</p>
+<p><strong>检查点：</strong> 能说清自己的方法如何从正文作判断、是否需要学习、学习用了哪部分数据。机器学习模型的单条错误解释可以提出文本层面的合理推测，不必假装已经知道模型内部的确定因果。</p>
+<h2>4. 用选定方法给出测试集答案（约 25 分钟）</h2>
+<p>先在下方填写 <code>METHOD_REASON</code>：选了哪种方法，为什么选择它。可以直接采用现成起点。具体的开发集数值比较统一在第5节的 <code>conclusion</code> 填写，此处无需重复。</p>
+<p>运行这一格，用选定方法处理 <code>data/test_texts.jsonl</code> 的全部 <strong>543 条短信</strong>，自动生成 <code>personal/test_predictions.csv</code>。文件必须包含以下两列：</p>
+<table>
+<thead>
+<tr>
+  <th>列名</th>
+  <th>含义</th>
+  <th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>id</code></td>
+  <td>原始测试短信编号</td>
+  <td>与测试文件对应，不能遗漏、重复或增加编号</td>
+</tr>
+<tr>
+  <td><code>label</code></td>
+  <td><strong>你的算法预测的类别</strong></td>
+  <td>程序为每条输出 <code>ham</code> 或 <code>spam</code></td>
+</tr>
+</tbody>
+</table>
+<p>这里的“测试集答案”就是算法的预测结果，不是教师参考答案。程序会显示前3条供你核对格式；你无需手工逐行填表。</p>
+<p><strong>学生包不含测试参考标签，也不在学生端显示测试分数。</strong> 教师收到预测后，用保留的参考标签计算查准率、召回率、F1、误拦和漏检。课堂结论先依据开发集，不需要猜测试成绩。</p>
+<p>如果继续根据开发集修改了方法，重新运行第3节、本节和导出单元格，确保提交的代码和测试答案对应同一个方案。不要手改 CSV 中的预测结果。</p>
+<pre><code class="language-python"># 你来填写：根据开发集结果说明方法选择理由。
+METHOD_REASON = &quot;&quot;
+formal = lab.predict_test(experiment, METHOD_REASON)
+</code></pre>
+<h2>5. 解释结果并提交（约 27 分钟）</h2>
+<p>填写学号及下面的简短说明，每项一两句话即可。错误示例取自第2节简单规则在开发集上的结果，不要求你的方法也同时出现两种错误。</p>
+<ul>
+<li><code>fp_id</code> / <code>fp_explanation</code>：一条误拦的编号、原文含义与触发原因。</li>
+<li><code>fn_id</code> / <code>fn_explanation</code>：一条漏检的编号、原文中被遗漏的线索。</li>
+<li><code>conclusion</code>：引用<strong>开发集</strong>上简单规则与你的方法的误拦、漏检数量，说明效果、代价和局限。测试集成绩由教师评测后给出，此处不填写测试分数。</li>
+<li><code>ai_used</code>：说明 AI 帮助了什么、自己如何核验；未使用写“未使用”。</li>
+</ul>
+<p>运行导出单元格后，提交 <strong>personal/W02_学号.zip</strong>，其中自动包含：</p>
+<ol>
+<li><strong>test_predictions.csv：全部543条测试短信的预测答案，列名为 id,label。</strong></li>
+<li><code>student_model.py</code> 与配置：产生这些答案的分类方法。</li>
+<li>开发集比较结果、逐条预测、数据与复现脚本。</li>
+<li>个人的方法理由、错误解释和结论。</li>
+</ol>
+<p>无需单独重复上传 CSV，答案已在 ZIP 内。导出工具直接使用本次模型运行结果生成 CSV。若重新选择了方法，请重新生成答案并导出，不要提交旧文件。</p>
+<p>完成标准：方法能运行，数据用途正确，开发集解释有依据，测试答案完整且与代码一致。结果不一定提高，方法复杂不额外加分。正常短信占多数，比较时同时看误拦和漏检。</p>
+<p>上传到延河课堂本次个人作业入口，另独立完成第二课5题。截止 <strong>2026年9月29日24:00（9月30日00:00）</strong>，具体入口以课程主页发布为准。确认平台提交成功。个人完成，无需小组汇总、截图或长报告。</p>
+<pre><code class="language-python">STUDENT_ID = &quot;&quot;
+NOTES = {
+    'fp_id': &quot;&quot;,
+    'fp_explanation': &quot;&quot;,
+    'fn_id': &quot;&quot;,
+    'fn_explanation': &quot;&quot;,
+    'conclusion': &quot;&quot;,
+    'ai_used': &quot;&quot;,
+}
+submission = lab.export_submission(STUDENT_ID, NOTES, formal)
+</code></pre>
+<h2>数据与方法出处</h2>
+<p>Almeida, T. &amp; Hidalgo, J. (2011). <em>SMS Spam Collection</em>. UCI Machine Learning Repository，<a href="https://archive.ics.uci.edu/dataset/228/sms+spam+collection">官方页面</a>，<a href="https://doi.org/10.24432/C5CC84">DOI</a>，<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>。本课程保留短信原文，进行去重、划分和格式转换。详见 data/README.md 与 manifest.json。</p>
+<p>本课数据全部取自后续 W04 的训练分区，再划成本课三部分，W04/W05 验证和测试分区保持原样。数据是历史英文短信，可能存在相似模板，不能据此保证方法适用于今天所有短信。测试参考答案仅随教师材料保存，不随学生包提供。</p>
+<p>方法代码参考 scikit-learn 官方文档：<a href="https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html">TF-IDF</a>、<a href="https://scikit-learn.org/stable/modules/generated/sklearn.naive_bayes.MultinomialNB.html">朴素贝叶斯</a>、<a href="https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html">逻辑回归</a>。本课运行和比较基础分类方法，后续训练课再深入参数更新与训练过程。</p>
+</main></html>

@@ -1,0 +1,11 @@
+# 依赖与运行产物
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 临时脚本
+_*.py
+
+# 个人提交产物（含学号与测试答案，不公开）
+personal/
